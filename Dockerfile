@@ -54,4 +54,4 @@ EXPOSE 7860
 
 #CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
 
-CMD ["sh", "-c", "python3 -m meutils.clis.server gunicorn-run main:app --port 8000 --workers ${WORKERS:-1} --threads 2"]
+CMD ["sh", "-c", "python3 -m meutils.clis.server gunicorn-run main:app --port 8000 --workers ${WORKERS:-1} --threads 2 --pythonpath python3"]
