@@ -2,7 +2,7 @@
 
 #git init
 git add *
-git add .dockerignore .github/workflows/docker-image.yml
+git add .github/workflows/docker-image.yml
 git commit -m "init"
 
 #git rm  -r dist
