@@ -26,10 +26,10 @@ def numpy_2_base64(img: np.ndarray):
 async def idphoto_inference(
     input_image: UploadFile,
     size: str = Form(...),
-    head_measure_ratio=0.2,
-    head_height_ratio=0.45,
-    top_distance_max=0.12,
-    top_distance_min=0.10,
+    head_measure_ratio: float=0.2,
+    head_height_ratio: float=0.45,
+    top_distance_max: float=0.12,
+    top_distance_min: float=0.10,
 ):
     image_bytes = await input_image.read()
     nparr = np.frombuffer(image_bytes, np.uint8)
