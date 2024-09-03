@@ -6,3 +6,8 @@ onnxruntime==1.15.0
 numpy==1.24.3
 gradio==3.38.0
 fastapi
+
+openai
+tiktoken
+
+minio
