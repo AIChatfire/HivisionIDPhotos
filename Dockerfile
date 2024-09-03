@@ -1,4 +1,18 @@
 FROM ubuntu:22.04
+# 环境变量
+ENV HF_ENDPOINT=https://hf.chatfire.cc
+ENV HF_TOKEN=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
+# FEISHU_APP_SECRET
+# MINIO_ACCESS_KEY
+
+ENV OPENAI_BASE_URL=https://api.chatfire.cn/v1
+ENV DIFY_BASE_URL=http://flow.chatfire.cn/v1
+
+ENV SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
+ENV MOONSHOT_BASE_URL=https://api.moonshot.cn/v1
+ENV DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+ENV ZHIPUAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+ENV GROQ_BASE_URL=https://api.groq.com/openai/v1
 
 # apt换源，安装pip
 #RUN echo "==> 换成清华源，并更新..."  && \
