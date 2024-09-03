@@ -1,18 +1,23 @@
 FROM ubuntu:22.04
 
 # apt换源，安装pip
-RUN echo "==> 换成清华源，并更新..."  && \
-    sed -i s@/archive.ubuntu.com/@/mirrors.tuna.tsinghua.edu.cn/@g /etc/apt/sources.list  && \
-    sed -i s@/security.ubuntu.com/@/mirrors.tuna.tsinghua.edu.cn/@g /etc/apt/sources.list  && \
-    apt-get clean  && \
-    apt-get update
+#RUN echo "==> 换成清华源，并更新..."  && \
+#    sed -i s@/archive.ubuntu.com/@/mirrors.tuna.tsinghua.edu.cn/@g /etc/apt/sources.list  && \
+#    sed -i s@/security.ubuntu.com/@/mirrors.tuna.tsinghua.edu.cn/@g /etc/apt/sources.list  && \
+#    apt-get clean  && \
+#    apt-get update
 
 # 安装python3.10
+#RUN apt-get install -y python3 curl && \
+#    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py  && \
+#    python3 get-pip.py && \
+#    pip3 install -U pip && \
+#    pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
 RUN apt-get install -y python3 curl && \
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py  && \
     python3 get-pip.py && \
-    pip3 install -U pip && \
-    pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+    pip3 install -U pip
 
 # 安装ffmpeg等库
 RUN apt-get install libpython3.10-dev ffmpeg libgl1-mesa-glx libglib2.0-0 cmake -y && \
