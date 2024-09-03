@@ -14,7 +14,7 @@ FROM ubuntu:22.04
 #    pip3 install -U pip && \
 #    pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
-RUN apt-get install -y python3 curl && \
+RUN apt-get clean && apt-get update && apt-get install -y python3 curl && \
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py  && \
     python3 get-pip.py && \
     pip3 install -U pip
