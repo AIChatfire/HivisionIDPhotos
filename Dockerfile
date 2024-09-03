@@ -31,4 +31,6 @@ RUN echo "==> Clean up..."  && \
 
 EXPOSE 7860
 
-CMD [ "python3", "app.py", "--host", "0.0.0.0", "--port", "7860"]
+#CMD [ "python3", "app.py", "--host", "0.0.0.0", "--port", "7860"]
+
+CMD ["uvicorn", "deploy_api:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

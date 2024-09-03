@@ -1,4 +1,5 @@
-from fastapi import FastAPI, UploadFile, Form
+from fastapi import FastAPI, UploadFile, Form, Depends
+from fastapi.exceptions import HTTPException
 import onnxruntime
 from src.face_judgement_align import IDphotos_create
 from src.layoutCreate import generate_layout_photo, generate_layout_image
@@ -8,7 +9,19 @@ import numpy as np
 import cv2
 import ast
 
-app = FastAPI()
+#######
+from meutils.pipe import logger, Optional
+from meutils.serving.fastapi import App
+from meutils.oss.minio_oss import Minio
+from meutils.schemas.idphoto_types import SIZES, COLORS
+from meutils.llm.openai_utils import ppu_flow
+from meutils.serving.fastapi.dependencies.auth import get_bearer_token, HTTPAuthorizationCredentials
+
+app = App()
+
+# 加载权重文件
+HY_HUMAN_MATTING_WEIGHTS_PATH = "./hivision_modnet.onnx"
+sess = onnxruntime.InferenceSession(HY_HUMAN_MATTING_WEIGHTS_PATH)
 
 
 # 将图像转换为 Base64 编码
@@ -16,71 +29,114 @@ app = FastAPI()
 
 def numpy_2_base64(img: np.ndarray):
     retval, buffer = cv2.imencode(".png", img)
-    base64_image = base64.b64encode(buffer).decode("utf-8")
+    _ = base64.b64encode(buffer).decode("utf-8")
+    return _
 
-    return base64_image
+
+async def numpy_to_url(img: np.ndarray):
+    retval, buffer = cv2.imencode(".png", img)
+
+    file = buffer.tobytes()
+    content_type = "image/png"
+
+    file_object = await Minio().put_object_for_openai(file=file, content_type=content_type)
+    return file_object.filename
 
 
 # 证件照智能制作接口
-@app.post("/idphoto")
+@app.post("/idphotos")
 async def idphoto_inference(
-    input_image: UploadFile,
-    size: str = Form(...),
-    head_measure_ratio: float=0.2,
-    head_height_ratio: float=0.45,
-    top_distance_max: float=0.12,
-    top_distance_min: float=0.10,
+        input_image: UploadFile,
+        size: str = Form("国家公务员考试"),
+        background_color: str = Form("白色"),  # "蓝色", "白色", "红色"
+        render_mode: str = Form('pure_color'),  # updown_gradient center_gradient
+
+        head_measure_ratio: float = 0.2,
+        head_height_ratio: float = 0.45,
+        top_distance_max: float = 0.12,
+        top_distance_min: float = 0.10,
+
+        auth: Optional[HTTPAuthorizationCredentials] = Depends(get_bearer_token),
+
 ):
+    api_key = auth and auth.credentials or None
+
     image_bytes = await input_image.read()
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
     # 将字符串转为元组
+    size = SIZES.get(size, size)
     size = ast.literal_eval(size)
 
-    (
-        result_image_hd,
-        result_image_standard,
-        typography_arr,
-        typography_rotate,
-        _,
-        _,
-        _,
-        _,
-        status,
-    ) = IDphotos_create(
-        img,
-        size=size,
-        head_measure_ratio=head_measure_ratio,
-        head_height_ratio=head_height_ratio,
-        align=False,
-        beauty=False,
-        fd68=None,
-        human_sess=sess,
-        IS_DEBUG=False,
-        top_distance_max=top_distance_max,
-        top_distance_min=top_distance_min,
-    )
+    # COLORS
+    background_color = COLORS.get(background_color, background_color)
+    background_color = ast.literal_eval(background_color)[::-1]
 
-    # 如果检测到人脸数量不等于 1（照片无人脸 or 多人脸）
-    if status == 0:
-        result_messgae = {"status": False}
+    logger.debug(size)
+    logger.debug(background_color)
 
-    # 如果检测到人脸数量等于 1, 则返回标准证和高清照结果（png 4 通道图像）
-    else:
-        result_messgae = {
-            "status": True,
-            "img_output_standard": numpy_2_base64(result_image_standard),
-            "img_output_standard_hd": numpy_2_base64(result_image_hd),
-        }
+    async with ppu_flow(api_key=api_key, post='api-idphotos'):
 
-    return result_messgae
+        (
+            result_image_hd,
+            result_image_standard,
+            typography_arr,
+            typography_rotate,
+            _,
+            _,
+            _,
+            _,
+            status,
+        ) = IDphotos_create(
+            img,
+            size=size,
+            head_measure_ratio=head_measure_ratio,
+            head_height_ratio=head_height_ratio,
+            align=False,
+            beauty=False,
+            fd68=None,
+            human_sess=sess,
+            IS_DEBUG=False,
+            top_distance_max=top_distance_max,
+            top_distance_min=top_distance_min,
+        )
+
+        # 如果检测到人脸数量不等于 1（照片无人脸 or 多人脸）
+        if status == 0:
+            raise HTTPException(status_code=401, detail="请检查照片：照片无人脸 or 多人脸")
+
+        # 如果检测到人脸数量等于 1, 则返回标准证和高清照结果（png 4 通道图像）
+        else:
+            # if background_color != (255, 255, 255):  # 默认白色
+
+            result_image_standard = np.uint8(
+                add_background(
+                    result_image_standard,
+                    bgr=background_color,
+                    mode=render_mode,
+                )
+            )
+            result_image_hd = np.uint8(
+                add_background(
+                    result_image_hd,
+                    bgr=background_color,
+                    mode=render_mode,
+                )
+            )
+
+            result_messgae = {
+                "status": True,
+                "img_output_standard": await numpy_to_url(result_image_standard),
+                "img_output_standard_hd": await numpy_to_url(result_image_hd),
+            }
+
+        return result_messgae
 
 
 # 透明图像添加纯色背景接口
 @app.post("/add_background")
 async def photo_add_background(input_image: UploadFile, color: str = Form(...)):
-
     # 读取图像
     image_bytes = await input_image.read()
     nparr = np.frombuffer(image_bytes, np.uint8)
@@ -94,7 +150,7 @@ async def photo_add_background(input_image: UploadFile, color: str = Form(...)):
     # try:
     result_messgae = {
         "status": True,
-        "image": numpy_2_base64(add_background(img, bgr=color)),
+        "image": await numpy_to_url(add_background(img, bgr=color)),
     }
 
     # except Exception as e:
@@ -109,12 +165,13 @@ async def photo_add_background(input_image: UploadFile, color: str = Form(...)):
 
 # 六寸排版照生成接口
 @app.post("/generate_layout_photos")
-async def generate_layout_photos(input_image: UploadFile, size: str = Form(...)):
+async def generate_layout_photos(input_image: UploadFile, size: str = Form("(413, 295)")):
     try:
         image_bytes = await input_image.read()
         nparr = np.frombuffer(image_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
+        size = SIZES.get(size, size)
         size = ast.literal_eval(size)
 
         typography_arr, typography_rotate = generate_layout_photo(
@@ -127,7 +184,7 @@ async def generate_layout_photos(input_image: UploadFile, size: str = Form(...))
 
         result_messgae = {
             "status": True,
-            "image": numpy_2_base64(result_layout_image),
+            "image": await numpy_to_url(result_layout_image),
         }
 
     except Exception as e:
@@ -141,9 +198,9 @@ async def generate_layout_photos(input_image: UploadFile, size: str = Form(...))
 if __name__ == "__main__":
     import uvicorn
 
-    # 加载权重文件
-    HY_HUMAN_MATTING_WEIGHTS_PATH = "./hivision_modnet.onnx"
-    sess = onnxruntime.InferenceSession(HY_HUMAN_MATTING_WEIGHTS_PATH)
+    # # 加载权重文件
+    # HY_HUMAN_MATTING_WEIGHTS_PATH = "./hivision_modnet.onnx"
+    # sess = onnxruntime.InferenceSession(HY_HUMAN_MATTING_WEIGHTS_PATH)
 
     # 在 8080 端口运行推理服务
     uvicorn.run(app, host="0.0.0.0", port=8080)

@@ -10,7 +10,6 @@ from image_utils import resize_image_to_kb
 from data_utils import csv_to_size_list
 import argparse
 
-
 # 获取尺寸列表
 root_dir = os.path.dirname(os.path.abspath(__file__))
 size_list_dict_CN = csv_to_size_list(os.path.join(root_dir, "size_list_CN.csv"))
@@ -45,23 +44,23 @@ def range_check(value, min_value=0, max_value=255):
 
 
 def idphoto_inference(
-    input_image,
-    mode_option,
-    size_list_option,
-    color_option,
-    render_option,
-    image_kb_options,
-    custom_color_R,
-    custom_color_G,
-    custom_color_B,
-    custom_size_height,
-    custom_size_width,
-    custom_image_kb,
-    language,
-    head_measure_ratio=0.2,
-    head_height_ratio=0.45,
-    top_distance_max=0.12,
-    top_distance_min=0.10,
+        input_image,
+        mode_option,
+        size_list_option,
+        color_option,
+        render_option,
+        image_kb_options,
+        custom_color_R,
+        custom_color_G,
+        custom_color_B,
+        custom_size_height,
+        custom_size_width,
+        custom_image_kb,
+        language,
+        head_measure_ratio=0.2,
+        head_height_ratio=0.45,
+        top_distance_max=0.12,
+        top_distance_min=0.10,
 ):
     idphoto_json = {
         "size_mode": mode_option,
@@ -112,9 +111,9 @@ def idphoto_inference(
         id_height = int(custom_size_height)
         id_width = int(custom_size_width)
         if (
-            id_height < id_width
-            or min(id_height, id_width) < 100
-            or max(id_height, id_width) > 1800
+                id_height < id_width
+                or min(id_height, id_width) < 100
+                or max(id_height, id_width) > 1800
         ):
             return {
                 img_output_standard: gr.update(value=None),
@@ -187,7 +186,12 @@ def idphoto_inference(
         }
 
     # 如果检测到人脸数量等于 1
-    else:
+    else:  ###########################################################################################
+
+        print(idphoto_json["color_bgr"])
+        print(idphoto_json["color_bgr"])
+        print(idphoto_json["color_bgr"])
+
         if idphoto_json["render_mode"] == text_lang_map[language]["Solid Color"]:
             result_image_standard = np.uint8(
                 add_background(result_image_standard, bgr=idphoto_json["color_bgr"])
@@ -196,8 +200,8 @@ def idphoto_inference(
                 add_background(result_image_hd, bgr=idphoto_json["color_bgr"])
             )
         elif (
-            idphoto_json["render_mode"]
-            == text_lang_map[language]["Up-Down Gradient (White)"]
+                idphoto_json["render_mode"]
+                == text_lang_map[language]["Up-Down Gradient (White)"]
         ):
             result_image_standard = np.uint8(
                 add_background(
@@ -230,8 +234,8 @@ def idphoto_inference(
             )
 
         if (
-            idphoto_json["size_mode"]
-            == text_lang_map[language]["Only Change Background"]
+                idphoto_json["size_mode"]
+                == text_lang_map[language]["Only Change Background"]
         ):
             result_layout_image = gr.update(visible=False)
         else:
@@ -411,6 +415,7 @@ if __name__ == "__main__":
                 img_output_layout = gr.Image(label="六寸排版照").style(height=350)
                 file_download = gr.File(label="下载调整 KB 大小后的照片", visible=False)
 
+
             # ---------------- 设置隐藏/显示组件 ----------------
             def change_language(language):
                 # 将Gradio组件中的内容改为中文或英文
@@ -487,24 +492,26 @@ if __name__ == "__main__":
                         ),
                     }
 
+
             def change_color(colors):
                 if colors == "自定义底色" or colors == "Custom Color":
                     return {custom_color: gr.update(visible=True)}
                 else:
                     return {custom_color: gr.update(visible=False)}
 
+
             def change_size_mode(size_option_item):
                 if (
-                    size_option_item == "自定义尺寸"
-                    or size_option_item == "Custom Size"
+                        size_option_item == "自定义尺寸"
+                        or size_option_item == "Custom Size"
                 ):
                     return {
                         custom_size: gr.update(visible=True),
                         size_list_row: gr.update(visible=False),
                     }
                 elif (
-                    size_option_item == "只换底"
-                    or size_option_item == "Only Change Background"
+                        size_option_item == "只换底"
+                        or size_option_item == "Only Change Background"
                 ):
                     return {
                         custom_size: gr.update(visible=False),
@@ -515,6 +522,7 @@ if __name__ == "__main__":
                         custom_size: gr.update(visible=False),
                         size_list_row: gr.update(visible=True),
                     }
+
 
             def change_image_kb(image_kb_option):
                 if image_kb_option == "自定义" or image_kb_option == "Custom":
