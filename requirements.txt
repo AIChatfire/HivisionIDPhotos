@@ -12,4 +12,14 @@ openai
 tiktoken
 
 minio
+redis
 moviepy
+
+jsonpath
+json_repair
+
+tabulate
+tenacity
+edge_tts
+
+python-multipart
