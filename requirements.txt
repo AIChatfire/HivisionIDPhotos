@@ -12,3 +12,4 @@ openai
 tiktoken
 
 minio
+moviepy

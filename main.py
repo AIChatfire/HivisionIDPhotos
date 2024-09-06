@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, Form, Depends
+from fastapi import FastAPI, UploadFile, Form, Depends, File, APIRouter
 from fastapi.exceptions import HTTPException
 import onnxruntime
 from src.face_judgement_align import IDphotos_create
@@ -12,12 +12,14 @@ import ast
 #######
 from meutils.pipe import logger, Optional
 from meutils.serving.fastapi import App
+from meutils.io.files_utils import to_bytes
+
 from meutils.oss.minio_oss import Minio
 from meutils.schemas.idphoto_types import SIZES, COLORS
 from meutils.llm.openai_utils import ppu_flow
 from meutils.serving.fastapi.dependencies.auth import get_bearer_token, HTTPAuthorizationCredentials
 
-app = App()
+router = APIRouter()
 
 # 加载权重文件
 HY_HUMAN_MATTING_WEIGHTS_PATH = "./hivision_modnet.onnx"
@@ -39,14 +41,16 @@ async def numpy_to_url(img: np.ndarray):
     file = buffer.tobytes()
     content_type = "image/png"
 
-    file_object = await Minio().put_object_for_openai(file=file, content_type=content_type)
+    file_object = await Minio().put_object_for_openai(file=file, bucket_name='caches', content_type=content_type)
     return file_object.filename
 
 
 # 证件照智能制作接口
-@app.post("/idphotos")
+@router.post("/generations")
 async def idphoto_inference(
-        input_image: UploadFile,
+        file: Optional[UploadFile] = None,
+        url: Optional[str] = Form(None),
+
         size: str = Form("国家公务员考试"),
         background_color: str = Form("白色"),  # "蓝色", "白色", "红色"
         render_mode: str = Form('pure_color'),  # updown_gradient center_gradient
@@ -61,7 +65,8 @@ async def idphoto_inference(
 ):
     api_key = auth and auth.credentials or None
 
-    image_bytes = await input_image.read()
+    image_bytes = await to_bytes(file) or await to_bytes(url)
+
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
@@ -135,7 +140,7 @@ async def idphoto_inference(
 
 
 # 透明图像添加纯色背景接口
-@app.post("/add_background")
+@router.post("/add_background")
 async def photo_add_background(input_image: UploadFile, color: str = Form(...)):
     # 读取图像
     image_bytes = await input_image.read()
@@ -164,7 +169,7 @@ async def photo_add_background(input_image: UploadFile, color: str = Form(...)):
 
 
 # 六寸排版照生成接口
-@app.post("/generate_layout_photos")
+@router.post("/generate_layout_photos")
 async def generate_layout_photos(input_image: UploadFile, size: str = Form("(413, 295)")):
     try:
         image_bytes = await input_image.read()
@@ -195,12 +200,11 @@ async def generate_layout_photos(input_image: UploadFile, size: str = Form("(413
     return result_messgae
 
 
-if __name__ == "__main__":
-    import uvicorn
+from routers import videos
 
-    # # 加载权重文件
-    # HY_HUMAN_MATTING_WEIGHTS_PATH = "./hivision_modnet.onnx"
-    # sess = onnxruntime.InferenceSession(HY_HUMAN_MATTING_WEIGHTS_PATH)
+app = App()
+app.include_router(router, "/v1/idphotos", tags=['证件照'])
+app.include_router(videos.router, "/v1/videos", tags=videos.TAGS)
 
-    # 在 8080 端口运行推理服务
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+if __name__ == '__main__':
+    app.run()
